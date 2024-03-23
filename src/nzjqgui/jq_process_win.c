@@ -7,6 +7,9 @@
 
 
 typedef struct _pipe_t Pipe;
+typedef struct _utf16string_t Utf16string;
+typedef struct _os_win_process_t OsWinProcess;
+
 
 struct _pipe_t
 {
@@ -16,23 +19,33 @@ struct _pipe_t
 };
 
 
-static bool_t pipe_init(Pipe* pipe, LPSECURITY_ATTRIBUTES security_attr_p)
+static Pipe* pipe_create(LPSECURITY_ATTRIBUTES security_attr_p)
 {
+    Pipe* pipe = heap_new0(Pipe);
+
+    pipe->read_handle = NULL;
+    pipe->write_handle = NULL;
     pipe->ok = CreatePipe(&(pipe->read_handle), &(pipe->write_handle), security_attr_p, 0);
-    return pipe->ok;
+
+    return pipe;
 }
 
-static void pipe_close(Pipe* pipe)
+static void pipe_close(Pipe** pipe)
 {
-    if (pipe->write_handle != NULL) {
-        CloseHandle(pipe->write_handle);
-        pipe->write_handle = NULL;
+    Pipe* p = *pipe;
+
+    if (p->write_handle != NULL) {
+        CloseHandle(p->write_handle);
+        p->write_handle = NULL;
     }
 
-    if (pipe->read_handle != NULL) {
-        CloseHandle(pipe->read_handle);
-        pipe->read_handle = NULL;
+    if (p->read_handle != NULL) {
+        CloseHandle(p->read_handle);
+        p->read_handle = NULL;
     }
+
+    heap_delete(pipe, Pipe);
+    *pipe = NULL;
 }
 
 static void pipe_connect_stderr(Pipe* pipe, STARTUPINFOW* startup_info)
@@ -89,7 +102,6 @@ static bool_t pipe_read_string(Pipe* pipe, Stream* output)
 }
 
 
-typedef struct _utf16string_t Utf16string;
 
 struct _utf16string_t
 {
@@ -144,7 +156,71 @@ static void utf16string_destroy(Utf16string str)
 }
 
 
-bool_t jq_process_run_win(String* json, String* query, Stream* output)
+
+struct _os_win_process_t
+{
+    bool_t success;
+    STARTUPINFOW startup_info;
+    PROCESS_INFORMATION process_info;
+    Pipe* pipe_in_p;
+    Pipe* pipe_out_p;
+};
+
+
+static OsWinProcess* os_win_process_start(String* path, String* args, Pipe* pipe_in, Pipe* pipe_out)
+{
+    OsWinProcess* process = heap_new0(OsWinProcess);
+    String* cli = NULL;
+
+    process->startup_info.cb = sizeof(process->startup_info);
+    process->startup_info.dwFlags |= STARTF_USESTDHANDLES;
+
+    pipe_connect_stderr(pipe_out, &process->startup_info);
+    pipe_connect_stdout(pipe_out, &process->startup_info);
+    pipe_connect_stdin(pipe_in, &process->startup_info);
+
+    /* Запуск подпроцесса <jq> */
+
+    cli = str_printf("\"%s\" \"%s\"", tc(path), tc(args));
+
+    // Utf16string exec_jq_path_utf16 = utf16string_from_string(path);
+    // Utf16string jp_command_line_utf16 = utf16string_from_string(cli);
+
+    process->success = CreateProcess( // W
+        tc(path),
+        tcc(args),
+        // exec_jq_path_utf16.data_p,
+        // jp_command_line_utf16.data_p,
+        NULL,
+        NULL,
+        TRUE,
+        CREATE_NO_WINDOW, // https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+        NULL,
+        NULL,
+        &process->startup_info,
+        &process->process_info
+    );
+
+    // utf16string_destroy(exec_jq_path_utf16);
+    // utf16string_destroy(jp_command_line_utf16);
+    str_destroy(&cli);
+
+    return process;
+}
+
+static void os_win_process_destroy(OsWinProcess** process)
+{
+    OsWinProcess* p = *process;
+
+    CloseHandle(p->process_info.hProcess);
+    CloseHandle(p->process_info.hThread);
+
+    heap_delete(process, OsWinProcess);
+    *process = NULL;
+}
+
+
+bool_t jq_process_run_win(const char_t* json, const char_t* query, Stream* output)
 {
     /* Проверка входных данных */
 
@@ -160,7 +236,13 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
     String* exec_jq_path = NULL;
     String* jq_command_line = NULL;
 
-    json_trimmed = str_trim(tc(json));
+    Utf16string json_trimmed_utf16 = { NULL, 0 };
+
+    Pipe* child_in = NULL;
+    Pipe* child_out = NULL;
+    OsWinProcess* process = NULL;
+
+    json_trimmed = str_trim(json);
     if (str_nchars(json_trimmed) == 0) {
         stm_printf(output, "[ОШБ] JSON пуст!\n");
         goto JQ_PROCESS_RUN__FINISH;
@@ -168,7 +250,7 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
 
     stm_printf(output, "[ИНФ] JSON: ЕСТЬ\n");
 
-    query_trimmed = str_trim(tc(query));
+    query_trimmed = str_trim(query);
     if (str_nchars(query_trimmed) == 0) {
         stm_printf(output, "[ОШБ] Запрос пуст!\n");
         goto JQ_PROCESS_RUN__FINISH;
@@ -204,66 +286,38 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
     security_attr.bInheritHandle = TRUE;
     security_attr.lpSecurityDescriptor = NULL;
 
-    Pipe child_in;
-    Pipe child_out;
+    child_in = pipe_create(&security_attr);
 
-    if (!pipe_init(&child_in, &security_attr)) {
+    if (!child_in->ok) {
         stm_printf(output, "[ОШБ] Не удалось создать канал ввода!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
 
-    if (!pipe_set_write_no_inherit(&child_in)) {
+    if (!pipe_set_write_no_inherit(child_in)) {
         stm_printf(output, "[ОШБ] Не удалось установить канал ввода NO INHERIT!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
 
-    if (!pipe_init(&child_out, &security_attr)) {
+    child_out = pipe_create(&security_attr);
+
+    if (!child_out->ok) {
         stm_printf(output, "[ОШБ] Не удалось создать канал вывода!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
 
-    if (!pipe_set_read_no_inherit(&child_out)) {
+    if (!pipe_set_read_no_inherit(child_out)) {
         stm_printf(output, "[ОШБ] Не удалось установить канал вывода NO INHERIT!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
 
-    STARTUPINFOW startup_info;
-    ZeroMemory(&startup_info, sizeof(startup_info));
-    startup_info.cb = sizeof(startup_info);
-    startup_info.dwFlags |= STARTF_USESTDHANDLES;
-
-    pipe_connect_stderr(&child_out, &startup_info);
-    pipe_connect_stdout(&child_out, &startup_info);
-    pipe_connect_stdin(&child_in, &startup_info);
-
-    PROCESS_INFORMATION process_info;
-    ZeroMemory(&process_info, sizeof(process_info));
-
     /* Запуск подпроцесса <jq> */
 
-    jq_command_line = str_printf("\"%s\" \"%s\"", tc(exec_jq_path), tc(query));
+    jq_command_line = str_printf("\"%s\" \"%s\"", tc(exec_jq_path), tc(query_trimmed));
     stm_printf(output, "[ИНФ] <jq> CLI: %s\n", tc(jq_command_line));
 
-    Utf16string exec_jq_path_utf16 = utf16string_from_string(exec_jq_path);
-    Utf16string jp_command_line_utf16 = utf16string_from_string(jq_command_line);
+    process = os_win_process_start(exec_jq_path, jq_command_line, child_in, child_out);
 
-    bool_t success = CreateProcessW(
-        exec_jq_path_utf16.data_p,
-        jp_command_line_utf16.data_p,
-        NULL,
-        NULL,
-        TRUE,
-        CREATE_NO_WINDOW, // https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
-        NULL,
-        NULL,
-        &startup_info,
-        &process_info
-    );
-
-    utf16string_destroy(exec_jq_path_utf16);
-    utf16string_destroy(jp_command_line_utf16);
-
-    if (!success) {
+    if (!process->success) {
         DWORD error_code = GetLastError();
         LPVOID lpMsgBuf = NULL;
 
@@ -285,14 +339,14 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
         goto JQ_PROCESS_RUN__FINISH;
     }
 
-    if (!pipe_write_string(&child_in, json)) {
+    if (!pipe_write_string(child_in, json_trimmed)) {
         stm_printf(output, "[ОШБ] Не удалось отправить <JSON> в <jq>!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
 
     pipe_close(&child_in);
 
-    if (!pipe_read_string(&child_out, output)) {
+    if (!pipe_read_string(child_out, output)) {
         stm_printf(output, "[ОШБ] Не удалось прочитать вывод <jq>!\n");
         goto JQ_PROCESS_RUN__FINISH;
     }
@@ -308,10 +362,19 @@ JQ_PROCESS_RUN__FINISH:
     str_destopt(&exec_jq_path);
     str_destopt(&jq_command_line);
 
-    pipe_close(&child_in);
-    pipe_close(&child_out);
-    CloseHandle(process_info.hProcess);
-    CloseHandle(process_info.hThread);
+    utf16string_destroy(json_trimmed_utf16);
+
+    if (child_in != NULL) {
+        pipe_close(&child_in);
+    }
+
+    if (child_out != NULL) {
+        pipe_close(&child_out);
+    }
+
+    if (process != NULL) {
+        os_win_process_destroy(&process);
+    }
 
     return result;
 }

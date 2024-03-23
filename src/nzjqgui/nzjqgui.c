@@ -28,14 +28,17 @@ typedef struct _app_t App;
 struct _app_t
 {
     Window* window;
-    TextView* text;
+    Edit* json_edit;
+    Edit* query_edit;
+    TextView* result_textview;
     uint32_t clicks;
 };
 
 static void i_OnButton(App* app, Event* e)
 {
-    String* json = str_c("[{ \"n\": 1 }, { \"n\": 2 }, { \"n\": 3 }]");
-    String* query = str_c(".[].n");
+    const char_t* json = edit_get_text(app->json_edit);
+    const char_t* query = edit_get_text(app->query_edit);
+
     Stream* output = stm_memory(nzMEMORY_STREAM_INIT_SIZE);
 
     bool_t success = jq_process_run_win(json, query, output);
@@ -43,10 +46,8 @@ static void i_OnButton(App* app, Event* e)
     String* message = stm_str(output);
     stm_close(&output);
 
-    textview_writef(app->text, tc(message));
+    textview_writef(app->result_textview, tc(message));
     str_destroy(&message);
-    str_destroy(&query);
-    str_destroy(&json);
 
     app->clicks += 1;
     unref(e);
@@ -93,7 +94,9 @@ static Panel* i_panel(App* app)
 
     button_OnClick(send_button, listener(app, i_OnButton, App));
 
-    app->text = result_textview;
+    app->json_edit = json_edit;
+    app->query_edit = query_edit;
+    app->result_textview = result_textview;
 
     /* Расположение
      */

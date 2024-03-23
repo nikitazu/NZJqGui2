@@ -7,7 +7,7 @@
 
 __EXTERN_C
 
-bool_t jq_process_run_win(String* json, String* query, Stream* output);
+bool_t jq_process_run_win(const char_t* json, const char_t* query, Stream* output);
 
 __END_C
 
