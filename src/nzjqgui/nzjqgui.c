@@ -1,4 +1,4 @@
-/* Hello World Application with NAppGui */
+/* Графический интерфейс для утилиты `jq` */
 
 #include <nappgui.h>
 #include "gui_helpers.h"
