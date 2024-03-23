@@ -108,7 +108,7 @@ static Panel* i_panel(App* app)
     layout_textview(layout, result_textview, 0, 5);
 
     layout_vexpand2(layout, 1, 5, 0.5);
-    layout_hexpand2(query_layout, 0, 1, 0.9);
+        layout_hexpand2(query_layout, 0, 1, 1);
 
     layout_margin(layout, nzGUI_MARGIN_M);
     layout_vmargin(layout, 0, nzGUI_MARGIN_S);
