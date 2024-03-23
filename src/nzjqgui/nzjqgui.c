@@ -1,13 +1,27 @@
-/* Графический интерфейс для утилиты `jq` */
+/* Графический интерфейс для утилиты `jq`
+ * ==
+ */
 
 #include <nappgui.h>
 #include "gui_helpers.h"
+#include "jq_process.h"
 
-/* Стандартные отступы */
+/* Стандартные отступы
+ * --
+ */
 
 const real32_t nzGUI_MARGIN_S = 4;
 const real32_t nzGUI_MARGIN_M = 8;
 
+/* Прочие константы
+ * --
+ */
+
+const uint32_t nzMEMORY_STREAM_INIT_SIZE = 2048;
+
+/* Модель приложения
+ * --
+ */
 
 typedef struct _app_t App;
 
@@ -20,9 +34,20 @@ struct _app_t
 
 static void i_OnButton(App* app, Event* e)
 {
-    String* msg = str_printf("[DBG] Button click (%d)\n", app->clicks);
-    textview_writef(app->text, tc(msg));
-    str_destroy(&msg);
+    String* json = str_c("[{ \"n\": 1 }, { \"n\": 2 }, { \"n\": 3 }]");
+    String* query = str_c(".[].n");
+    Stream* output = stm_memory(nzMEMORY_STREAM_INIT_SIZE);
+
+    bool_t success = jq_process_run(json, query, output);
+
+    String* message = stm_str(output);
+    stm_close(&output);
+
+    textview_writef(app->text, tc(message));
+    str_destroy(&message);
+    str_destroy(&query);
+    str_destroy(&json);
+
     app->clicks += 1;
     unref(e);
 }
