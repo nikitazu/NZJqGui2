@@ -199,7 +199,7 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
     /* Подготовка каналов ввода/вывода */
 
     SECURITY_ATTRIBUTES security_attr;
-
+    ZeroMemory(&security_attr, sizeof(security_attr));
     security_attr.nLength = sizeof(SECURITY_ATTRIBUTES);
     security_attr.bInheritHandle = TRUE;
     security_attr.lpSecurityDescriptor = NULL;
