@@ -4,7 +4,7 @@
 
 #include <nappgui.h>
 #include "gui_helpers.h"
-#include "jq_process.h"
+#include "jq_process_win.h"
 
 /* Стандартные отступы
  * --
@@ -38,7 +38,7 @@ static void i_OnButton(App* app, Event* e)
     String* query = str_c(".[].n");
     Stream* output = stm_memory(nzMEMORY_STREAM_INIT_SIZE);
 
-    bool_t success = jq_process_run(json, query, output);
+    bool_t success = jq_process_run_win(json, query, output);
 
     String* message = stm_str(output);
     stm_close(&output);
