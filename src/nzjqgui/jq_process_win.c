@@ -89,6 +89,61 @@ static bool_t pipe_read_string(Pipe* pipe, Stream* output)
 }
 
 
+typedef struct _utf16string_t Utf16string;
+
+struct _utf16string_t
+{
+    wchar_t* data_p;
+    uint32_t size;
+};
+
+static Utf16string utf16string_from_string(String* str)
+{
+    Utf16string result = { NULL, 0 };
+
+    char_t* str_p = tc(str);
+    uint32_t str_len = blib_strlen(str_p);
+
+    int buffer_size = MultiByteToWideChar(
+        CP_UTF8,
+        0,                  // flags are deprecated
+        str_p,
+        -1,                 // null terminated string
+        NULL,               // we are calculating size, buffer not needed
+        0                   // 0 means we need to calculate the required buffer size
+    );
+
+    if (buffer_size <= 0) {
+        return result;
+    }
+
+    wchar_t* buffer = heap_new_n(buffer_size, wchar_t);
+
+    int buffer_create_resut = MultiByteToWideChar(
+        CP_UTF8,
+        0,                  // flags are deprecated
+        str_p,
+        -1,                 // null terminated string
+        buffer,
+        buffer_size
+    );
+
+    result.data_p = buffer;
+    result.size = buffer_size;
+
+    return result;
+}
+
+static void utf16string_destroy(Utf16string str)
+{
+    if (str.data_p != NULL) {
+        heap_delete_n(&str.data_p, str.size, wchar_t);
+        str.data_p = NULL;
+        str.size = 0;
+    }
+}
+
+
 bool_t jq_process_run_win(String* json, String* query, Stream* output)
 {
     /* Проверка входных данных */
@@ -189,9 +244,12 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
     jq_command_line = str_printf("\"%s\" \"%s\"", tc(exec_jq_path), tc(query));
     stm_printf(output, "[ИНФ] <jq> CLI: %s\n", tc(jq_command_line));
 
-    bool_t success = CreateProcess( // TODO (W) пока не работает
-        tc(exec_jq_path),
-        tcc(jq_command_line),
+    Utf16string exec_jq_path_utf16 = utf16string_from_string(exec_jq_path);
+    Utf16string jp_command_line_utf16 = utf16string_from_string(jq_command_line);
+
+    bool_t success = CreateProcessW(
+        exec_jq_path_utf16.data_p,
+        jp_command_line_utf16.data_p,
         NULL,
         NULL,
         TRUE,
@@ -201,6 +259,9 @@ bool_t jq_process_run_win(String* json, String* query, Stream* output)
         &startup_info,
         &process_info
     );
+
+    utf16string_destroy(exec_jq_path_utf16);
+    utf16string_destroy(jp_command_line_utf16);
 
     if (!success) {
         DWORD error_code = GetLastError();
