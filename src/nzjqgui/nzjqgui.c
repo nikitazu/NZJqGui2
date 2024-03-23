@@ -31,49 +31,49 @@ static void i_OnButton(App* app, Event* e)
 
 static Panel* i_panel(App* app)
 {
-    // Контент
-    //
+    /* Контент
+     */
 
     Panel* panel = panel_create();
     Layout* layout = layout_create(1, 6);
 
-    // Надпись JSON
+    /* Надпись JSON */
     Label* json_label = label_create();
     label_text(json_label, "JSON");
 
-    // Поле ввода JSON
+    /* Поле ввода JSON */
     Edit* json_edit = edit_multiline();
 
-    // Надпись Запрос
+    /* Надпись Запрос */
     Label* query_label = label_create();
     label_text(query_label, "Запрос");
 
-    // Панель Запрос
+    /* Панель Запрос */
     Layout* query_layout = layout_create(2, 1);
 
-        // Поле ввода Запрос
+        /* Поле ввода Запрос */
         Edit* query_edit = edit_create();
 
-        // Кнопка Отправить
+        /* Кнопка Отправить */
         Button* send_button = button_push();
         button_text(send_button, "Отправить");
 
-    // Надпись Результат
+    /* Надпись Результат */
     Label* result_label = label_create();
     label_text(result_label, "Результат");
 
-    // Поле вывода Результат
+    /* Поле вывода Результат */
     TextView* result_textview = textview_create();
 
-    // Регистрация обработчиков событий
-    //
+    /* Регистрация обработчиков событий
+     */
 
     button_OnClick(send_button, listener(app, i_OnButton, App));
 
     app->text = result_textview;
 
-    // Расположение
-    //
+    /* Расположение
+     */
 
     layout_label(layout, json_label, 0, 0);
     layout_edit(layout, json_edit, 0, 1);
