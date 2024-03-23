@@ -4,11 +4,9 @@
 #include "gui_helpers.h"
 
 /* Стандартные отступы */
-typedef enum _nz_gui_margin_px_t
-{
-    nzGUI_MARGIN_S = 4,
-    nzGUI_MARGIN_M = 8,
-} nz_gui_margin_px_t;
+
+const real32_t nzGUI_MARGIN_S = 4;
+const real32_t nzGUI_MARGIN_M = 8;
 
 
 typedef struct _app_t App;
