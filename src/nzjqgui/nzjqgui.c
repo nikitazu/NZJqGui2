@@ -5,6 +5,7 @@
 #include <nappgui.h>
 #include "gui_helpers.h"
 #include "jq_process_win.h"
+#include "main_menu.h"
 
 /* Стандартные отступы
  * --
@@ -28,6 +29,7 @@ typedef struct _app_t App;
 struct _app_t
 {
     Window* window;
+    Menu* main_menu;
     Edit* json_edit;
     Edit* query_edit;
     TextView* result_textview;
@@ -136,21 +138,30 @@ static App* i_create(void)
 {
     App* app = heap_new0(App);
     Panel* panel = i_panel(app);
+
+    app->main_menu = main_menu_create();
     app->window = window_create(ekWINDOW_STDRES);
+
     window_panel(app->window, panel);
     window_title(app->window, "NZ JQ Gui 2 v0.1.0");
     window_size(app->window, s2df(800, 600));
     window_set_center_screen_origin(app->window);
+    osapp_menubar(app->main_menu, app->window);
 
     window_OnClose(app->window, listener(app, i_OnClose, App));
     window_show(app->window);
+
     return app;
 }
 
 static void i_destroy(App** app)
 {
     Window* window = (*app)->window;
+    Menu* main_menu = (*app)->main_menu;
+
     window_destroy(&window);
+    menu_destroy(&main_menu);
+
     heap_delete(app, App);
 }
 
