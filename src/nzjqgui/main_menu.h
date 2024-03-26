@@ -4,10 +4,11 @@
 /* Главное меню приложения */
 
 #include <nappgui.h>
+#include "controller.h"
 
 __EXTERN_C
 
-Menu* main_menu_create(void);
+Menu* main_menu_create(Controller* ctrl);
 
 __END_C
 

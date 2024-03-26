@@ -3,6 +3,7 @@
  */
 
 #include <nappgui.h>
+#include "controller.h"
 #include "gui_helpers.h"
 #include "jq_process_win.h"
 #include "main_menu.h"
@@ -28,6 +29,7 @@ typedef struct _app_t App;
 
 struct _app_t
 {
+    Controller* ctrl;
     Window* window;
     Menu* main_menu;
     Edit* json_edit;
@@ -139,8 +141,12 @@ static App* i_create(void)
     App* app = heap_new0(App);
     Panel* panel = i_panel(app);
 
-    app->main_menu = main_menu_create();
+    app->ctrl = controller_create();
+    app->main_menu = main_menu_create(app->ctrl);
     app->window = window_create(ekWINDOW_STDRES);
+
+    controller_main_window(app->ctrl, app->main_menu);
+    controller_json_edit(app->ctrl, app->json_edit);
 
     window_panel(app->window, panel);
     window_title(app->window, "NZ JQ Gui 2 v0.1.0");
@@ -156,9 +162,11 @@ static App* i_create(void)
 
 static void i_destroy(App** app)
 {
+    Controller* ctrl = (*app)->ctrl;
     Window* window = (*app)->window;
     Menu* main_menu = (*app)->main_menu;
 
+    controller_destroy(&ctrl);
     window_destroy(&window);
     menu_destroy(&main_menu);
 
