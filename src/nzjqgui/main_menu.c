@@ -1,8 +1,12 @@
 #include "main_menu.h"
 #include "controller.h"
+#include "gui_helpers.h"
+#include "gui_sizes.h"
 
 
 #define FILE_TYPE_ARR_SIZE 1
+#define DIALOG_WINDOW_FLAGS ekWINDOW_TITLE | ekWINDOW_CLOSE | ekWINDOW_RETURN | ekWINDOW_ESC
+#define DIALOG_WINDOW_SIZE s2df(500, 300)
 
 
 /* Определения "наперёд"
@@ -61,8 +65,10 @@ static Menu* i_file_menu_create(Controller* ctrl)
     MenuItem* quit_item = menuitem_create();
 
     menuitem_text(open_item, "Открыть");
-    menuitem_text(save_item, "Сохранить");
+    menuitem_text(save_item, "Сохранить (в разработке)");
     menuitem_text(quit_item, "Выход");
+
+    menuitem_enabled(save_item, FALSE);
 
     menuitem_OnClick(open_item, listener(ctrl, i_OnFileOpen, Controller));
     menuitem_OnClick(save_item, listener(ctrl, i_OnFileSave, Controller));
@@ -129,8 +135,10 @@ static Menu* i_help_menu_create(Controller* ctrl)
     MenuItem* about_item = menuitem_create();
     MenuItem* manual_item = menuitem_create();
 
-    menuitem_text(about_item, "О программе");
-    menuitem_text(manual_item, "Руководство пользователя");
+    menuitem_text(about_item, "О программе (в разработке)");
+    menuitem_text(manual_item, "Руководство пользователя (в разработке)");
+
+    menuitem_enabled(manual_item, FALSE);
 
     menuitem_OnClick(about_item, listener(ctrl, i_OnHelpAbout, Controller));
     menuitem_OnClick(manual_item, listener(ctrl, i_OnHelpManual, Controller));
@@ -144,6 +152,92 @@ static Menu* i_help_menu_create(Controller* ctrl)
 static void i_OnHelpAbout(Controller* ctrl, Event* e)
 {
     bstd_printf("[ИНФ] Меню: Справка -> О программе\n");
+
+    Window* main_win = controller_get_main_window(ctrl);
+    S2Df main_win_size = window_get_size(main_win);
+    V2Df main_win_pos = window_get_origin(main_win);
+
+    Window* about_win = window_create(DIALOG_WINDOW_FLAGS);
+    Panel* panel = panel_create();
+    Layout* main_layout = layout_create(1, 4);
+    Layout* prop_layout = layout_create(2, 3);
+    Layout* foot_layout = layout_create(1, 2);
+
+    /* Название программы */
+    Label* title_label = label_create();
+    label_text(title_label, "NZ JQ Gui 2");
+
+    /* Версия */
+    Label* version_label = label_create();
+    label_text(version_label, "Версия");
+
+    /* Значение версия */
+    Label* version_val_label = label_create();
+    label_text(version_val_label, "0.1.0");
+
+    /* Автор */
+    Label* author_label = label_create();
+    label_text(author_label, "Автор");
+
+    /* Значение автора */
+    Label* author_val_label = label_create();
+    label_text(author_val_label, "Никита Б. Зуев <nikitazu@gmail.com>");
+
+    /* Лицензия */
+    Label* license_label = label_create();
+    label_text(license_label, "Лицензия");
+
+    /* Значение лицензии */
+    Label* license_val_label = label_create();
+    label_text(license_val_label, "GPLv3");
+
+    /* Благодарности */
+    Label* thanks_label = label_create();
+    label_text(thanks_label, "Благодарности");
+
+    /* Текст благодарности */
+    Label* thanks_val_label = label_multiline();
+    label_align(thanks_val_label, ekTOP);
+    label_text(
+        thanks_val_label,
+        "Francisco García Collado,\n"
+        "  автор NAppGUI SDK (MIT License)\n"
+        "  https://nappgui.com/en/home/web/home.html\n"
+        "  \n"
+    );
+
+    layout_label(main_layout, title_label, 0, 0);
+    layout_layout(main_layout, prop_layout, 0, 1);
+        layout_label(prop_layout, version_label, 0, 0);
+        layout_label(prop_layout, version_val_label, 1, 0);
+        layout_label(prop_layout, author_label, 0, 1);
+        layout_label(prop_layout, author_val_label, 1, 1);
+        layout_label(prop_layout, license_label, 0, 2);
+        layout_label(prop_layout, license_val_label, 1, 2);
+    layout_layout(main_layout, foot_layout, 0, 2);
+        layout_label(foot_layout, thanks_label, 0, 0);
+        layout_label(foot_layout, thanks_val_label, 0, 1);
+
+    layout_vexpand2(main_layout, 2, 3, 0.3);
+        layout_vexpand(foot_layout, 1);
+
+    layout_margin(main_layout, nzGUI_MARGIN_M);
+    layout_vmargin(main_layout, 0, nzGUI_MARGIN_XL);
+        layout_vmargin(prop_layout, 0, nzGUI_MARGIN_S);
+        layout_vmargin(prop_layout, 1, nzGUI_MARGIN_S);
+    layout_vmargin(main_layout, 1, nzGUI_MARGIN_XL);
+        layout_vmargin(foot_layout, 0, nzGUI_MARGIN_S);
+
+    panel_layout(panel, main_layout);
+    window_panel(about_win, panel);
+    window_title(about_win, "О программе");
+    window_size(about_win, DIALOG_WINDOW_SIZE);
+    window_set_center_parent_origin(about_win, main_win_size, main_win_pos);
+
+    uint32_t result = window_modal(about_win, main_win);
+    bstd_printf("[ИНФ] Результат: %ud\n", result);
+
+    window_destroy(&about_win);
     unref(e);
 }
 

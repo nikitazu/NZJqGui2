@@ -5,15 +5,9 @@
 #include <nappgui.h>
 #include "controller.h"
 #include "gui_helpers.h"
+#include "gui_sizes.h"
 #include "jq_process_win.h"
 #include "main_menu.h"
-
-/* Стандартные отступы
- * --
- */
-
-const real32_t nzGUI_MARGIN_S = 4;
-const real32_t nzGUI_MARGIN_M = 8;
 
 /* Прочие константы
  * --
@@ -145,7 +139,7 @@ static App* i_create(void)
     app->main_menu = main_menu_create(app->ctrl);
     app->window = window_create(ekWINDOW_STDRES);
 
-    controller_main_window(app->ctrl, app->main_menu);
+    controller_main_window(app->ctrl, app->window);
     controller_json_edit(app->ctrl, app->json_edit);
 
     window_panel(app->window, panel);
